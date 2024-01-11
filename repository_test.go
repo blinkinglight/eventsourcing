@@ -83,7 +83,7 @@ func TestGetWithContextCancel(t *testing.T) {
 	}
 	err = repo.Save(person)
 	if err != nil {
-		t.Fatal("could not save aggregate")
+		t.Fatalf("could not save aggregate %+v", err)
 	}
 
 	twin := Person{}
@@ -272,7 +272,7 @@ func TestEventChainDoesNotHang(t *testing.T) {
 
 	err = repo.Save(person)
 	if err != nil {
-		t.Fatal("could not save aggregate")
+		t.Fatalf("could not save aggregate %+v", err)
 	}
 	close(eventChan)
 	<-doneChan
@@ -327,7 +327,7 @@ func CreatePersonNoRegisteredEvents(name string) (*PersonNoRegisterEvents, error
 		return nil, errors.New("name can't be blank")
 	}
 	person := PersonNoRegisterEvents{}
-	person.TrackChange(&person, &BornNoRegisteredEvents{Name: name})
+	person.TrackChange(&person, "person.born", &BornNoRegisteredEvents{Name: name})
 	return &person, nil
 }
 

@@ -1,13 +1,11 @@
 package eventsourcing
 
 import (
-	"reflect"
-
 	"github.com/hallgren/eventsourcing/core"
 )
 
-type registerFunc = func() interface{}
-type RegisterFunc = func(events ...interface{})
+type registerFunc func() (interface{}, string)
+type RegisterFunc func(events ...interface{})
 
 type register struct {
 	aggregateEvents map[string]registerFunc
@@ -24,7 +22,7 @@ func newRegister() *register {
 // EventRegistered return the func to generate the correct event data type and true if it exists
 // otherwise false.
 func (r *register) EventRegistered(event core.Event) (registerFunc, bool) {
-	d, ok := r.aggregateEvents[event.AggregateType+"_"+event.Reason]
+	d, ok := r.aggregateEvents[event.Reason]
 	return d, ok
 }
 
@@ -44,7 +42,8 @@ func (r *register) Register(a aggregate) {
 	fe := func(events ...interface{}) []registerFunc {
 		res := []registerFunc{}
 		for _, e := range events {
-			res = append(res, eventToFunc(e))
+			el := e.(func() (interface{}, string))
+			res = append(res, el)
 		}
 		return res
 	}
@@ -52,14 +51,17 @@ func (r *register) Register(a aggregate) {
 	fu := func(events ...interface{}) {
 		eventsF := fe(events...)
 		for _, f := range eventsF {
-			event := f()
-			reason := reflect.TypeOf(event).Elem().Name()
-			r.aggregateEvents[typ+"_"+reason] = f
+			st, reason := f()
+			if reason == "" {
+				if r, ok := st.(Resoner); ok {
+					reason = r.Reason()
+				} else {
+					panic("no event reason")
+				}
+			}
+			// reason := reflect.TypeOf(event).Elem().Name()
+			r.aggregateEvents[reason] = f
 		}
 	}
 	a.Register(fu)
-}
-
-func eventToFunc(event interface{}) registerFunc {
-	return func() interface{} { return event }
 }

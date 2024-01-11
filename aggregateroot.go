@@ -11,6 +11,7 @@ import (
 // AggregateRoot to be included into aggregates
 type AggregateRoot struct {
 	aggregateID            string
+	aggregateName          string
 	aggregateVersion       Version
 	aggregateGlobalVersion Version
 	aggregateEvents        []Event
@@ -23,23 +24,36 @@ const (
 // ErrAggregateAlreadyExists returned if the aggregateID is set more than one time
 var ErrAggregateAlreadyExists = errors.New("its not possible to set ID on already existing aggregate")
 
+type Resoner interface {
+	Reason() string
+}
+
 // TrackChange is used internally by behaviour methods to apply a state change to
 // the current instance and also track it in order that it can be persisted later.
-func (ar *AggregateRoot) TrackChange(a aggregate, data interface{}) {
-	ar.TrackChangeWithMetadata(a, data, nil)
+func (ar *AggregateRoot) TrackChange(a aggregate, event string, data interface{}) {
+	ar.TrackChangeWithMetadata(a, event, data, nil)
 }
 
 // TrackChangeWithMetadata is used internally by behaviour methods to apply a state change to
 // the current instance and also track it in order that it can be persisted later.
 // meta data is handled by this func to store none related application state
-func (ar *AggregateRoot) TrackChangeWithMetadata(a aggregate, data interface{}, metadata map[string]interface{}) {
+func (ar *AggregateRoot) TrackChangeWithMetadata(a aggregate, ev string, data interface{}, metadata map[string]interface{}) {
 	// This can be overwritten in the constructor of the aggregate
 	if ar.aggregateID == emptyAggregateID {
 		ar.aggregateID = idFunc()
 	}
 
+	if ev == "" {
+		if r, ok := data.(Resoner); ok {
+			ev = r.Reason()
+		} else {
+			panic("no event reason")
+		}
+	}
+
 	event := Event{
 		event: core.Event{
+			Reason:        ev,
 			AggregateID:   ar.aggregateID,
 			Version:       ar.nextVersion(),
 			AggregateType: aggregateType(a),
@@ -133,6 +147,13 @@ func (ar *AggregateRoot) UnsavedEvents() bool {
 	return len(ar.aggregateEvents) > 0
 }
 
+type Typer interface {
+	Type() string
+}
+
 func aggregateType(a aggregate) string {
+	if t, ok := a.(Typer); ok {
+		return t.Type()
+	}
 	return reflect.TypeOf(a).Elem().Name()
 }

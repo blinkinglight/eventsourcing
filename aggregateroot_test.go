@@ -22,8 +22,16 @@ type Born struct {
 	Name string
 }
 
+func (b *Born) Reason() string {
+	return "person.born"
+}
+
 // AgedOneYear event
 type AgedOneYear struct {
+}
+
+func (a *AgedOneYear) Reason() string {
+	return "person.aged-one-year"
 }
 
 // CreatePerson constructor for the Person
@@ -32,7 +40,7 @@ func CreatePerson(name string) (*Person, error) {
 		return nil, errors.New("name can't be blank")
 	}
 	person := Person{}
-	person.TrackChange(&person, &Born{Name: name})
+	person.TrackChange(&person, "", &Born{Name: name})
 	return &person, nil
 }
 
@@ -49,7 +57,7 @@ func CreatePersonWithID(id, name string) (*Person, error) {
 	} else if err != nil {
 		return nil, err
 	}
-	person.TrackChange(&person, &Born{Name: name})
+	person.TrackChange(&person, "person.born", &Born{Name: name})
 	return &person, nil
 }
 
@@ -57,12 +65,15 @@ func CreatePersonWithID(id, name string) (*Person, error) {
 func (person *Person) GrowOlder() {
 	metaData := make(map[string]interface{})
 	metaData["foo"] = "bar"
-	person.TrackChangeWithMetadata(person, &AgedOneYear{}, metaData)
+	person.TrackChangeWithMetadata(person, "person.aged-one-year", &AgedOneYear{}, metaData)
 }
 
 // Register bind the events to the repository when the aggregate is registered.
 func (person *Person) Register(f eventsourcing.RegisterFunc) {
-	f(&Born{}, &AgedOneYear{})
+	f(
+		func() (any, string) { return &Born{}, "person.born" }, //define event to db
+		func() (any, string) { return &AgedOneYear{}, "" },     // AgedOneYear should implement Reasoner interface
+	)
 }
 
 // Transition the person state dependent on the events
@@ -155,8 +166,8 @@ func TestPersonAgedOneYear(t *testing.T) {
 		t.Fatal("There should be two event on the person aggregateRoot", person.Events())
 	}
 
-	if person.Events()[len(person.Events())-1].Reason() != "AgedOneYear" {
-		t.Fatal("The last event reason should be AgedOneYear", person.Events()[len(person.Events())-1].Reason())
+	if person.Events()[len(person.Events())-1].Reason() != "person.aged-one-year" {
+		t.Fatalf("The last event reason should be AgedOneYear %+v", person.Events()[len(person.Events())-1].Reason())
 	}
 
 	d, ok := person.Events()[1].Metadata()["foo"]

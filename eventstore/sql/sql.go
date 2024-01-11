@@ -88,6 +88,18 @@ func (s *SQL) Get(ctx context.Context, id string, aggregateType string, afterVer
 	return &iterator{rows: rows}, nil
 }
 
+// Get the events from database
+// TODO: This is a temporary solution to get the events from the database
+// id,aggregateType,afterVersion, should go first
+func (s *SQL) GetWhere(ctx context.Context, where string, vars ...any) (core.Iterator, error) {
+	selectStm := `Select seq, id, version, reason, type, timestamp, data, metadata from events where id=? and type=? and version>? order by version asc`
+	rows, err := s.db.QueryContext(ctx, selectStm, vars...)
+	if err != nil {
+		return nil, err
+	}
+	return &iterator{rows: rows}, nil
+}
+
 // GlobalEvents return count events in order globally from the start posistion
 func (s *SQL) GlobalEvents(start, count uint64) ([]core.Event, error) {
 	selectStm := `Select seq, id, version, reason, type, timestamp, data, metadata from events where seq >= ? order by seq asc LIMIT ?`

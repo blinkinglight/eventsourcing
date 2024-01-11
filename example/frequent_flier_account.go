@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/hallgren/eventsourcing"
 )
@@ -56,7 +57,8 @@ type PromotedToGoldStatus struct{}
 // CreateFrequentFlierAccount constructor
 func CreateFrequentFlierAccount(id string) *FrequentFlierAccountAggregate {
 	self := FrequentFlierAccountAggregate{}
-	self.TrackChange(&self, &FrequentFlierAccountCreated{OpeningMiles: 0, OpeningTierPoints: 0})
+	self.SetID("for-test")
+	// self.TrackChange(&self, "flight.a", &FrequentFlierAccountCreated{OpeningMiles: 0, OpeningTierPoints: 0})
 	return &self
 }
 
@@ -75,14 +77,14 @@ func NewFrequentFlierAccountFromHistory(events []eventsourcing.Event) *FrequentF
 // If recording this flight takes the account over a status boundary, it will
 // automatically upgrade the account to the new status level.
 func (f *FrequentFlierAccountAggregate) RecordFlightTaken(miles int, tierPoints int) {
-	f.TrackChange(f, &FlightTaken{MilesAdded: miles, TierPointsAdded: tierPoints})
+	f.TrackChange(f, "flight.b", &FlightTaken{MilesAdded: miles, TierPointsAdded: tierPoints})
 
 	if f.tierPoints > 10 && f.status != StatusSilver {
-		f.TrackChange(f, &StatusMatched{NewStatus: StatusSilver})
+		f.TrackChange(f, "flight.c", &StatusMatched{NewStatus: StatusSilver})
 	}
 
 	if f.tierPoints > 20 && f.status != StatusGold {
-		f.TrackChange(f, &PromotedToGoldStatus{})
+		f.TrackChange(f, "flight.d", &PromotedToGoldStatus{})
 	}
 }
 
@@ -90,10 +92,10 @@ func (f *FrequentFlierAccountAggregate) RecordFlightTaken(miles int, tierPoints 
 // correct type.
 func (f *FrequentFlierAccountAggregate) Register(r eventsourcing.RegisterFunc) {
 	r(
-		&FrequentFlierAccountCreated{},
-		&StatusMatched{},
-		&FlightTaken{},
-		&PromotedToGoldStatus{},
+		func() (any, string) { return &FrequentFlierAccountCreated{}, "flight.a" },
+		func() (any, string) { return &StatusMatched{}, "flight.b" },
+		func() (any, string) { return &FlightTaken{}, "flight.c" },
+		func() (any, string) { return &PromotedToGoldStatus{}, "flight.d" },
 	)
 }
 
@@ -144,4 +146,35 @@ func (f FrequentFlierAccountAggregate) String() string {
 	(aggregateVersion: %d)
 `
 	return fmt.Sprintf(format, f.ID(), f.miles, f.tierPoints, f.status, reason, aggregateType, len(f.Events()), f.Version())
+}
+
+type Custom struct {
+	eventsourcing.AggregateRoot
+	count int
+}
+
+func (f *Custom) Type() string {
+	return "FrequentFlierAccountAggregate"
+}
+
+// Register is a callback method that register the events to the repository to unmarshal event.Data to it's
+// correct type.
+func (f *Custom) Register(r eventsourcing.RegisterFunc) {
+	r(
+		func() (any, string) { return &FrequentFlierAccountCreated{}, "flight.a" },
+		func() (any, string) { return &StatusMatched{}, "flight.b" },
+		func() (any, string) { return &FlightTaken{}, "flight.c" },
+		func() (any, string) { return &PromotedToGoldStatus{}, "flight.d" },
+	)
+}
+
+// Transition implements the pattern match against event types used both as part
+// of the fold when loading from history and when tracking an individual change.
+func (f *Custom) Transition(event eventsourcing.Event) {
+	// log.Printf("%v", event)
+	f.count++
+}
+
+func (f *Custom) Print() {
+	log.Printf("Custom events found %v", f.count)
 }

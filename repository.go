@@ -171,7 +171,7 @@ func (r *Repository) GetWithContext(ctx context.Context, id string, a aggregate)
 			if !found {
 				continue
 			}
-			data := f()
+			data, ch := f()
 			err = r.Deserializer(event.Data, &data)
 			if err != nil {
 				return err
@@ -183,6 +183,7 @@ func (r *Repository) GetWithContext(ctx context.Context, id string, a aggregate)
 			}
 
 			e := NewEvent(event, data, metadata)
+			e.SetReason(ch)
 			root.BuildFromHistory(a, []Event{e})
 		}
 	}

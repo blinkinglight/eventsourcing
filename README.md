@@ -48,7 +48,9 @@ Example or the Register method:
 ```go
 // Register callback method that register Person events to the repository
 func (person *Person) Register(r eventsourcing.RegisterFunc) {
-    r(&Born{}, &AgedOneYear{})
+    r(
+        func() (any, strnig) { &Born{}, "person.born" }, 
+        func() (any, string) { &AgedOneYear{}, "person.aged-one-year" })
 }
 ```
 
@@ -79,7 +81,7 @@ func CreatePerson(name string) (*Person, error) {
 		return nil, errors.New("name can't be blank")
 	}
 	person := Person{}
-	person.TrackChange(&person, &Born{Name: name})
+	person.TrackChange(&person, "", &Born{Name: name})
 	return &person, nil
 }
 ```

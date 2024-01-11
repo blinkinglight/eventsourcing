@@ -1,7 +1,6 @@
 package eventsourcing
 
 import (
-	"reflect"
 	"time"
 
 	"github.com/hallgren/eventsourcing/core"
@@ -18,6 +17,10 @@ type Event struct {
 
 func NewEvent(e core.Event, data interface{}, metadata map[string]interface{}) Event {
 	return Event{event: e, data: data, metadata: metadata}
+}
+
+func (e *Event) SetReason(reason string) {
+	e.event.Reason = reason
 }
 
 func (e Event) Data() interface{} {
@@ -37,11 +40,14 @@ func (e Event) AggregateID() string {
 }
 
 func (e Event) Reason() string {
-	if e.data == nil {
-		return ""
-	}
-	return reflect.TypeOf(e.data).Elem().Name()
+	return e.event.Reason
 }
+
+// 	if e.data == nil {
+// 		return ""
+// 	}
+// 	return reflect.TypeOf(e.data).Elem().Name()
+// }
 
 func (e Event) Version() Version {
 	return Version(e.event.Version)

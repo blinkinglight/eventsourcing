@@ -5,15 +5,23 @@ import (
 	"time"
 
 	"github.com/hallgren/eventsourcing"
-	"github.com/hallgren/eventsourcing/eventstore/memory"
+
+	dsql "database/sql"
+
+	"github.com/hallgren/eventsourcing/eventstore/sql"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
 	var c = make(chan eventsourcing.Event)
 	// Setup a memory based event store
-	eventStore := memory.Create()
-	repo := eventsourcing.NewRepository(eventStore)
+	sdb, _ := dsql.Open("sqlite3", "es.sqlite3")
+	db := sql.Open(sdb)
+	db.Migrate()
+	repo := eventsourcing.NewRepository(db)
 	repo.Register(&FrequentFlierAccountAggregate{})
+	repo.Register(&Custom{})
 
 	f := func(e eventsourcing.Event) {
 		fmt.Printf("Event from stream %q\n", e)
@@ -36,12 +44,21 @@ func main() {
 
 	// Creates the aggregate and adds a second event
 	aggregate := CreateFrequentFlierAccount("morgan")
+	if err := repo.Get("for-test", aggregate); err != nil {
+		aggregate.TrackChange(aggregate, "flight.a", &FrequentFlierAccountCreated{OpeningMiles: 0, OpeningTierPoints: 0})
+	}
+
+	err := repo.Save(aggregate)
+	if err != nil {
+		panic("Could not save the aggregate" + err.Error())
+	}
 	aggregate.RecordFlightTaken(10, 5)
 
 	// saves the events to the memory backed eventstore
-	err := repo.Save(aggregate)
+	err = repo.Save(aggregate)
 	if err != nil {
-		panic("Could not save the aggregate")
+		// repo.Get("for-test", aggregate)
+		panic("Could not save the aggregate" + err.Error())
 	}
 
 	// Load the saved aggregate
@@ -55,4 +72,12 @@ func main() {
 	time.Sleep(time.Millisecond * 100)
 	fmt.Println("AGGREGATE")
 	fmt.Println(copy)
+
+	var cm Custom
+	err = repo.Get("for-test", &cm)
+	if err != nil {
+		panic(err)
+	}
+	cm.Print()
+
 }

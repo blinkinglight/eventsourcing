@@ -25,3 +25,7 @@ type EventStore interface {
 	Save(events []Event) error
 	Get(ctx context.Context, id string, aggregateType string, afterVersion Version) (Iterator, error)
 }
+
+type EventStoreExpanded interface {
+	GetWhere(a context.Context, b string, c ...any) (Iterator, error)
+}

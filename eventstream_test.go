@@ -29,8 +29,8 @@ func (a *AnotherAggregate) Register(e eventsourcing.RegisterFunc) {}
 
 type AnotherEvent struct{}
 
-var event = eventsourcing.NewEvent(core.Event{Version: 123, AggregateType: "AnAggregate", Data: eventToByte(&AnEvent{Name: "123"})}, &AnEvent{Name: "123"}, nil)
-var otherEvent = eventsourcing.NewEvent(core.Event{Version: 456, Data: eventToByte(&AnotherEvent{}), AggregateType: "AnotherAggregate"}, &AnotherEvent{}, nil)
+var event = eventsourcing.NewEvent(core.Event{Reason: "hello", Version: 123, AggregateType: "AnAggregate", Data: eventToByte(&AnEvent{Name: "123"})}, &AnEvent{Name: "123"}, nil)
+var otherEvent = eventsourcing.NewEvent(core.Event{Reason: "hallo", Version: 456, Data: eventToByte(&AnotherEvent{}), AggregateType: "AnotherAggregate"}, &AnotherEvent{}, nil)
 
 func eventToByte(i interface{}) []byte {
 	b, _ := json.Marshal(i)
@@ -341,12 +341,12 @@ func TestName(t *testing.T) {
 	s2 := e.Name(f, "AnAggregate", "AnEvent2")
 	defer s2.Close()
 	// not triggered
-	s3 := e.Name(f, "AnAggregate2", "AnEvent")
+	s3 := e.Name(f, "AnAggregate", "hello")
 	defer s3.Close()
 	e.Publish(AnAggregate{}.AggregateRoot, []eventsourcing.Event{event})
 
 	if streamEvent.Version() != event.Version() {
-		t.Fatalf("wrong info in event got %q expected %q", streamEvent.Version(), event.Version())
+		t.Fatalf("wrong info in event got %d expected %d", streamEvent.Version(), event.Version())
 	}
 	if streamEvent.Data() == nil {
 		t.Fatalf("should have received event data")

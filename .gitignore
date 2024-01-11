@@ -3,3 +3,4 @@ example/example
 coverage.txt
 *.swp
 go.work
+*.sqlite3
