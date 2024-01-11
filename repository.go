@@ -17,6 +17,10 @@ type aggregate interface {
 	Register(RegisterFunc)
 }
 
+type aggregateWithQuery interface {
+	Query(string) (string, []any)
+}
+
 type EventSubscribers interface {
 	All(f func(e Event)) *subscription
 	AggregateID(f func(e Event), aggregates ...aggregate) *subscription
@@ -194,4 +198,69 @@ func (r *Repository) GetWithContext(ctx context.Context, id string, a aggregate)
 // version of the aggregate.
 func (r *Repository) Get(id string, a aggregate) error {
 	return r.GetWithContext(context.Background(), id, a)
+}
+
+// GetWithContext fetches the aggregates event and build up the aggregate based on it's current version.
+// The event fetching can be canceled from the outside.
+func (r *Repository) GetRaw(ctx context.Context, id string, a aggregate) error {
+	if reflect.ValueOf(a).Kind() != reflect.Ptr {
+		return errors.New("aggregate needs to be a pointer")
+	}
+
+	root := a.Root()
+	// aggregateType := aggregateType(a)
+
+	aq, ok := a.(aggregateWithQuery)
+	if !ok {
+		return errors.New("aggregate needs to implement the Query method")
+	}
+
+	q, params := aq.Query(id)
+
+	// fetch events after the current version of the aggregate that could be fetched from the snapshot store
+	// eventIterator, err := r.eventStore.Get(ctx, id, aggregateType, core.Version(root.aggregateVersion))
+	eventIterator, err := r.eventStore.GetWhere(ctx, q, params...)
+	if err != nil && !errors.Is(err, core.ErrNoEvents) {
+		return err
+	} else if errors.Is(err, core.ErrNoEvents) && root.Version() == 0 {
+		// no events and not based on a snapshot
+		return ErrAggregateNotFound
+	}
+	defer eventIterator.Close()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			event, err := eventIterator.Next()
+			if err != nil && !errors.Is(err, core.ErrNoMoreEvents) {
+				return err
+			} else if errors.Is(err, core.ErrNoMoreEvents) && root.Version() == 0 {
+				// no events and no snapshot (some eventstore will not return the error ErrNoEvent on Get())
+				return ErrAggregateNotFound
+			} else if errors.Is(err, core.ErrNoMoreEvents) {
+				return nil
+			}
+			// apply the event to the aggregate
+			f, found := r.register.EventRegistered(event)
+			if !found {
+				continue
+			}
+			data, ch := f()
+			err = r.Deserializer(event.Data, &data)
+			if err != nil {
+				return err
+			}
+			metadata := make(map[string]interface{})
+			err = r.Deserializer(event.Metadata, &metadata)
+			if err != nil {
+				return err
+			}
+
+			e := NewEvent(event, data, metadata)
+			e.SetReason(ch)
+			root.BuildFromHistory(a, []Event{e})
+		}
+	}
 }

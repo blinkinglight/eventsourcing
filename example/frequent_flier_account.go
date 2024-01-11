@@ -153,6 +153,10 @@ type Custom struct {
 	count int
 }
 
+func (f *Custom) Query(id string) (string, []any) {
+	return "SELECT * FROM events WHERE 1=1 ", []any{}
+}
+
 func (f *Custom) Type() string {
 	return "FrequentFlierAccountAggregate"
 }
@@ -171,7 +175,14 @@ func (f *Custom) Register(r eventsourcing.RegisterFunc) {
 // Transition implements the pattern match against event types used both as part
 // of the fold when loading from history and when tracking an individual change.
 func (f *Custom) Transition(event eventsourcing.Event) {
-	// log.Printf("%v", event)
+	switch e := event.Data().(type) {
+	case *FrequentFlierAccountCreated:
+		log.Printf("hehe %T", e)
+	case *StatusMatched:
+		log.Printf("haha %T", e)
+	default:
+		log.Printf("%T", e)
+	}
 	f.count++
 }
 

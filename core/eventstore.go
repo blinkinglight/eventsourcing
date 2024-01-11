@@ -24,6 +24,8 @@ type Iterator interface {
 type EventStore interface {
 	Save(events []Event) error
 	Get(ctx context.Context, id string, aggregateType string, afterVersion Version) (Iterator, error)
+
+	EventStoreExpanded
 }
 
 type EventStoreExpanded interface {

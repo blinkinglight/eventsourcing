@@ -91,9 +91,9 @@ func (s *SQL) Get(ctx context.Context, id string, aggregateType string, afterVer
 // Get the events from database
 // TODO: This is a temporary solution to get the events from the database
 // id,aggregateType,afterVersion, should go first
-func (s *SQL) GetWhere(ctx context.Context, where string, vars ...any) (core.Iterator, error) {
-	selectStm := `Select seq, id, version, reason, type, timestamp, data, metadata from events where id=? and type=? and version>? order by version asc`
-	rows, err := s.db.QueryContext(ctx, selectStm, vars...)
+func (s *SQL) GetWhere(ctx context.Context, query string, vars ...any) (core.Iterator, error) {
+	// selectStm := `Select seq, id, version, reason, type, timestamp, data, metadata from events where id=? and type=? and version>? order by version asc`
+	rows, err := s.db.QueryContext(ctx, query, vars...)
 	if err != nil {
 		return nil, err
 	}

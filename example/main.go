@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -52,7 +53,8 @@ func main() {
 	if err != nil {
 		panic("Could not save the aggregate" + err.Error())
 	}
-	aggregate.RecordFlightTaken(10, 5)
+
+	// aggregate.RecordFlightTaken(1, 5)
 
 	// saves the events to the memory backed eventstore
 	err = repo.Save(aggregate)
@@ -74,7 +76,7 @@ func main() {
 	fmt.Println(copy)
 
 	var cm Custom
-	err = repo.Get("for-test", &cm)
+	err = repo.GetRaw(context.TODO(), "for-test", &cm)
 	if err != nil {
 		panic(err)
 	}

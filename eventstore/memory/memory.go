@@ -125,6 +125,23 @@ func (e *Memory) GlobalEvents(start, count uint64) ([]core.Event, error) {
 // Close does nothing
 func (e *Memory) Close() {}
 
+func (e *Memory) GetWhere(ctx context.Context, query string, varz ...any) (core.Iterator, error) {
+	var events []core.Event
+	// make sure its thread safe
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	for _, e := range e.eventsInOrder {
+		if e.AggregateType == varz[0].(string) && e.Version > varz[1].(core.Version) {
+			events = append(events, e)
+		}
+	}
+	if len(events) == 0 {
+		return nil, core.ErrNoEvents
+	}
+	return &iterator{events: events}, nil
+}
+
 // aggregateKey generate a aggregate key to store events against from aggregateType and aggregateID
 func aggregateKey(aggregateType, aggregateID string) string {
 	return aggregateType + "_" + aggregateID
